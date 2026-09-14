@@ -1,0 +1,18 @@
+%% StorageHub — State chart: vòng đời Rental (RT-)
+stateDiagram-v2
+    [*] --> Active : check-in xong (cấp access code)
+
+    Active --> Active : gia hạn [fee đã trả: EndDate dịch ngay] (sinh addendum chờ ký)
+    Active --> CheckoutRequested : KH gửi checkout request
+
+    CheckoutRequested --> Closed : settlement hoàn tất [refund = deposit − damage fee]
+    Closed --> [*]
+
+    note right of Active
+        Gia hạn hiệu lực ngay sau
+        thanh toán — phụ lục CT chỉ là
+        paperwork, không hold unit.
+        Conflict guard: không đè
+        reservation kế tiếp
+        ("Latest new checkout: Oct 18").
+    end note

@@ -1,0 +1,23 @@
+%% StorageHub — State chart: vòng đời Contract (CT-)
+stateDiagram-v2
+    [*] --> Draft : auto-draft [ngay khi deposit thành công, khóa policy version]
+
+    Draft --> Printed : staff in tại quầy
+    Printed --> Signed : KH ký + staff chụp ảnh attach
+    Signed --> Active : rental kích hoạt (hợp đồng gốc)
+    Active --> Closed : settlement tham chiếu số hợp đồng
+    Active --> Superseded : addendum thay ngày kết thúc
+
+    Draft --> AwaitingSignature : addendum gia hạn [auto-draft sau khi trả fee]
+    AwaitingSignature --> Signed : ký tại quầy [deadline 7 ngày, bell reminder]
+    AwaitingSignature --> AwaitingSignature : quá hạn [banner amber + nhắc việc]
+
+    Signed --> [*] : addendum đã filed
+    Closed --> [*]
+
+    note right of Printed
+        Printed chặn cấp access code
+        đến khi có ảnh bản ký.
+        Hợp đồng không ai sửa được —
+        chỉnh = draft lại.
+    end note

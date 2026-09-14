@@ -1,0 +1,13 @@
+%% StorageHub — State chart: vòng đời Reservation (BK-)
+stateDiagram-v2
+    [*] --> PendingPayment : KH đặt unit (Booking Summary)
+
+    PendingPayment --> Reserved : payment gateway xác nhận deposit
+    PendingPayment --> PendingPayment : payment fail [retry / đổi method]
+    PendingPayment --> [*] : KH bỏ qua [không giữ unit]
+
+    Reserved --> CheckedIn : trả 100% rent + ký hợp đồng (sinh Rental)
+    Reserved --> Expired : quá hạn check-in [unit trả về Available]
+    Reserved --> Cancelled : huỷ đặt [hoàn deposit theo policy]
+
+    CheckedIn --> [*]
