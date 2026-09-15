@@ -674,7 +674,7 @@ Hệ thống gồm \textbf{22 thực thể} chia thành \textbf{8 nhóm chức n
 \end{xltabular}
 
 \subsubsection{ESCALATIONS (NÂNG CẤP XỬ LÝ)}
-\textbf{Mô tả:} Staff được phép escalate ticket cho manager nhưng \textbf{bắt buộc kèm ghi chú}. Manager quyết định: mức severe (unit $\rightarrow$ Maintenance + tái định vị khách) hoặc trả về staff kèm hướng dẫn. Quyết định ghi vào Activity Log.
+\textbf{Mô tả:} Staff được phép escalate ticket cho manager nhưng \textbf{bắt buộc kèm ghi chú}. Manager quyết định: mức severe (unit $\rightarrow$ Maintenance + tái định vị khách, phân công lại NV xử lý) hoặc trả về staff kèm hướng dẫn. Quyết định ghi vào Activity Log.
 
 \begin{xltabular}{\textwidth}{|p{4.4cm}|p{3.6cm}|X|p{3.4cm}|}
 \caption{Thuộc tính thực thể ESCALATIONS} \\
@@ -916,6 +916,8 @@ Closed & -- & $[\circ]$ & Kết thúc phiên thuê \\ \hline
 
 Hợp đồng gốc: auto-draft ngay khi đặt cọc thành công (khoá phiên bản policy), staff in tại quầy, khách ký + staff chụp ảnh attach, rental kích hoạt thì hợp đồng Active; settlement đối chiếu số hợp đồng khi đóng. \textbf{Hợp đồng không ai sửa được} -- muốn sửa phải draft lại; vì thế gia hạn đi theo nhánh \textbf{phụ lục (addendum)}: auto-draft sau khi trả phí, chờ ký với hạn 7 ngày (quá hạn hiển thị banner amber + nhắc việc), ký xong hợp đồng gốc bị Superseded về ngày kết thúc.
 
+Ba điểm bổ sung: (1) \textit{in lại} không đổi trạng thái -- bản in là dữ kiện một khi đã đúng thì đúng mãi, mỗi lần in chỉ ghi Activity Log; (2) nếu booking bị huỷ hoặc quá hạn check-in trước khi ký, hợp đồng gốc (Draft/Printed) bị Closed theo policy hoàn cọc, không treo lơ lửng; (3) quá hạn ký phụ lục \textit{không có terminal} -- nhắc việc lặp vô hạn định, vì EndDate đã dịch ngay từ khi trả phí nên phụ lục chỉ còn là hồ sơ giấy. Sơ đồ gộp vòng đời hai loại hợp đồng: guard loại hợp đồng ghi ở từng chuyển dịch (type = ORIGINAL cho bản gốc, type = ADDENDUM cho phụ lục).
+
 \begin{xltabular}{\textwidth}{|p{2.6cm}|p{4.4cm}|p{2.6cm}|X|}
 \caption{Bảng chuyển dịch trạng thái của Contract} \\
 \hline
@@ -926,13 +928,17 @@ Hợp đồng gốc: auto-draft ngay khi đặt cọc thành công (khoá phiên
 \endhead
 $[\bullet]$ & deposit thành công & Draft & Auto-draft; snapshot theo phiên bản policy \\ \hline
 Draft & staff in tại quầy & Printed & Chờ ảnh bản ký \\ \hline
+Printed & in lại [giấy mất / khách chưa ký] & Printed & Không đổi trạng thái; mỗi lần in ghi Activity Log \\ \hline
 Printed & khách ký + staff chụp ảnh attach & Signed & Lưu \attr{SignedPhotoUrl} \\ \hline
-Signed & rental kích hoạt & Active & Hợp đồng gốc có hiệu lực \\ \hline
+Signed & rental kích hoạt [type = ORIGINAL] & Active & Hợp đồng gốc có hiệu lực \\ \hline
 Active & settlement đối chiếu số hợp đồng & Closed & Kết thúc cùng phiên thuê \\ \hline
 Active & addendum thay ngày kết thúc & Superseded & Hợp đồng gốc nhường cho phụ lục \\ \hline
-Draft & addendum gia hạn [phí đã trả] & AwaitingSignature & Auto-draft phụ lục; \attr{ParentContractID} trỏ gốc \\ \hline
+Draft & addendum gia hạn [phí đã trả, type = ADDENDUM] & AwaitingSignature & Auto-draft phụ lục; \attr{ParentContractID} trỏ gốc \\ \hline
 AwaitingSignature & ký tại quầy [hạn 7 ngày] & Signed & Bell reminder trước hạn \\ \hline
-AwaitingSignature & quá hạn & AwaitingSignature & Banner amber + nhắc việc (tự vòng) \\ \hline
+AwaitingSignature & quá hạn & AwaitingSignature & Banner amber + nhắc việc (tự vòng, không terminal) \\ \hline
+Signed & addendum đã filed [type = ADDENDUM] & $[\circ]$ & Phụ lục hoàn tất hồ sơ giấy \\ \hline
+Draft & booking huỷ / quá hạn check-in [hoàn cọc theo policy] & Closed & Đóng hợp đồng gốc chưa hiệu lực \\ \hline
+Printed & booking huỷ / quá hạn check-in [hoàn cọc theo policy] & Closed & Đóng; không cấp access code \\ \hline
 \end{xltabular}
 
 \begin{figure}[H]
@@ -944,7 +950,7 @@ AwaitingSignature & quá hạn & AwaitingSignature & Banner amber + nhắc việ
 
 \subsection{State chart: Support Ticket (hỗ trợ -- SR-)}
 
-Ticket vào Open khi khách gửi support request, được định tuyến tới staff trực ca theo unit + shift. Staff xử lý xong thì Resolved (kèm note); nếu vượt thẩm quyền thì Escalated -- \textbf{bắt buộc có note}. Manager có hai lối: quyết định severe (unit $\rightarrow$ Maintenance + tái định vị khách) hoặc trả về staff kèm guidance. Ticket severe không bao giờ bị bỏ rơi: quyết định ghi Activity Log, khách nhận notification từng bước.
+Ticket vào Open khi khách gửi support request, được định tuyến tới staff trực ca theo unit + shift. Staff xử lý xong thì Resolved (kèm note); nếu vượt thẩm quyền thì Escalated -- \textbf{bắt buộc có note}. Manager luôn đưa ticket về lại nhân viên: quyết định severe (unit $\rightarrow$ Maintenance + tái định vị khách + phân công xử lý) hay trả về kèm guidance, ticket đều quay lại InProgress và chỉ Resolved khi staff hoàn tất phần việc của mình. Ticket severe không bao giờ bị bỏ rơi: quyết định ghi Activity Log, khách nhận notification từng bước. Danh sách ticket phía khách hiển thị thêm nhãn xám ``Closed'' cho ticket Resolved cũ -- đó là trạng thái hiển thị (archive), không phải giá trị enum riêng.
 
 \begin{xltabular}{\textwidth}{|p{2.6cm}|p{4.4cm}|p{2.6cm}|X|}
 \caption{Bảng chuyển dịch trạng thái của Support Ticket} \\
@@ -958,7 +964,7 @@ $[\bullet]$ & khách gửi support request & Open & Định tuyến theo unit + 
 Open & route tới staff trực ca & InProgress & Gán \attr{AssignedStaffID}; sinh task support TL- \\ \hline
 InProgress & staff xử lý xong + note & Resolved & Thông báo cho khách \\ \hline
 InProgress & staff escalate [bắt buộc note] & Escalated & Sinh escalation; manager nhận notification \\ \hline
-Escalated & manager đánh giá severe & Resolved & Unit $\rightarrow$ Maintenance; tái định vị khách; Activity Log \\ \hline
+Escalated & manager quyết severe + phân công NV & InProgress & Unit $\rightarrow$ Maintenance; tái định vị khách; sinh task xử lý; Activity Log \\ \hline
 Escalated & manager trả về staff [kèm guidance] & InProgress & Staff tiếp tục theo hướng dẫn \\ \hline
 \end{xltabular}
 
@@ -1372,10 +1378,14 @@ stateDiagram-v2
                                    khoa policy version]
 
     Draft --> Printed : staff in tai quay
+    Printed --> Printed : in lai [giay mat / KH chua ky]
     Printed --> Signed : KH ky + staff chup anh attach
     Signed --> Active : rental kich hoat (hop dong goc)
     Active --> Closed : settlement tham chieu so hop dong
     Active --> Superseded : addendum thay ngay ket thuc
+    Draft --> Closed : booking huy / qua han check-in
+                        [hoan coc theo policy]
+    Printed --> Closed : booking huy / qua han check-in
 
     Draft --> AwaitingSignature : addendum gia han
                                         [auto-draft sau khi tra fee]
@@ -1393,6 +1403,11 @@ stateDiagram-v2
         Hop dong khong ai sua duoc -
         chinh = draft lai.
     end note
+    note right of AwaitingSignature
+        Qua han khong co terminal:
+        EndDate da dich tu khi tra fee,
+        phu luc chi la ho so giay.
+    end note
 \end{Verbatim}
 \end{mermaidbox}
 
@@ -1408,8 +1423,9 @@ stateDiagram-v2
     InProgress --> Resolved : staff xu ly xong + note
     InProgress --> Escalated : staff escalate [bat buoc co note]
 
-    Escalated --> Resolved : manager danh gia severe
-                             [unit -> Maintenance + tai dinh vi KH]
+    Escalated --> InProgress : manager quyet severe
+                             [unit -> Maintenance + tai dinh vi KH
+                              + phan cong NV xu ly]
     Escalated --> InProgress : manager tra ve staff [kem guidance]
 
     Resolved --> [*]
