@@ -207,7 +207,9 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="edge_rel_e15_0" edge="1" parent="1" source="resv" style="html=1;fontSize=22;fontStyle=1;endArrow=none;startArrow=none;strokeColor=#6b7280;strokeWidth=1.8;labelBackgroundColor=#ffffff;rounded=0;" target="r_e15" value="1">
-          <mxGeometry relative="1" as="geometry" />
+          <mxGeometry relative="1" x="-0.6816" y="-5" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
         </mxCell>
         <mxCell id="edge_rel_e15_1" edge="1" parent="1" source="contract" style="html=1;fontSize=22;fontStyle=1;endArrow=none;startArrow=none;strokeColor=#6b7280;strokeWidth=1.8;labelBackgroundColor=#ffffff;rounded=0;" target="r_e15" value="1">
           <mxGeometry relative="1" as="geometry" />
@@ -223,7 +225,7 @@
             <mxPoint as="offset" />
           </mxGeometry>
         </mxCell>
-        <mxCell id="edge_e28_1" edge="1" parent="1" source="annex" style="html=1;fontSize=14;fontStyle=1;endArrow=none;startArrow=none;strokeColor=#6b7280;strokeWidth=1.8;labelBackgroundColor=#ffffff;rounded=0;" target="r_e28" value="thêm mới">
+        <mxCell id="edge_e28_1" edge="1" parent="1" source="annex" style="html=1;fontSize=14;fontStyle=1;endArrow=none;startArrow=none;strokeColor=#6b7280;strokeWidth=1.8;labelBackgroundColor=#ffffff;rounded=0;" target="r_e28" value="*mới thêm">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="2990" y="2050" />

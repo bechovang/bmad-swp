@@ -1,13 +1,18 @@
 // ============================================================================
-// StorageHub — ERD (dbdiagram.io)
-// Nguồn: ERD_Statechart_LaTeX/report — 22 bảng, 34 quan hệ (kèm 3 tự tham chiếu)
+// StorageHub — ERD (dbdiagram.io) — V3 2026-09-18
+// Nguồn: ERD_Statechart_LaTeX/report — 22 bảng, 31 quan hệ (kèm 1 tự tham chiếu)
 // Cách dùng: paste toàn bộ file vào https://dbdiagram.io/d → New Diagram
 // Quy ước: PK = khoá chính, UK = unique; cột ENUM khớp 1-1 với 7 state chart
+// Thay đổi V3: (1) gộp rentals vào reservations (1 bảng trọn vòng đời đặt chỗ
+// → thuê → trả); (2) reservations 1:1 contracts ("sinh"); (3) tách bảng
+// contract_addendums riêng (bỏ self-FK ParentContractID); (4) FK RentalID
+// ở extensions/checkout_requests/settlements/support_tickets/payments đổi
+// nguồn sang reservations; payments bỏ cột RentalID.
 // ============================================================================
 
 Project StorageHub {
   database_type: 'MySQL'
-  Note: 'StorageHub — Hệ thống quản lý kho thuê tự phục vụ (SWP391). Tiền tệ DECIMAL(18,2) VND. Mã hồ sơ: BK- / RT- / SR- / CT- / TL-.'
+  Note: 'StorageHub — Hệ thống quản lý kho thuê tự phục vụ (SWP391). Tiền tệ DECIMAL(18,2) VND. Mã hồ sơ: BK- / SR- / CT- / CT-…-A1 / TL- (BK- duy nhất suốt vòng đời đặt chỗ → thuê → trả).'
 }
 
 // ---------------------------------------------------------------- ENUMS ----
@@ -38,18 +43,15 @@ Enum unit_status {
   RETIRED
 }
 
+// V3: gộp vòng đời rental — thêm CHECKOUT_REQUESTED + CLOSED (từ rental_status cũ)
 Enum reservation_status {
   PENDING_PAYMENT
   RESERVED
   CHECKED_IN
-  EXPIRED
-  CANCELLED
-}
-
-Enum rental_status {
-  ACTIVE
   CHECKOUT_REQUESTED
   CLOSED
+  EXPIRED
+  CANCELLED // dự phòng theo policy — v1 không kích hoạt (PRD §6 Non-Goals)
 }
 
 Enum extension_status {
@@ -62,19 +64,20 @@ Enum checkout_request_status {
   DONE
 }
 
-Enum contract_type {
-  ORIGINAL
-  ADDENDUM
-}
-
+// V3: 6 giá trị — AWAITING_SIGNATURE chuyển sang addendum_status
 Enum contract_status {
   DRAFT
   PRINTED
   SIGNED
   ACTIVE
-  AWAITING_SIGNATURE
   CLOSED
   SUPERSEDED
+}
+
+// V3: mới — vòng đời phụ lục tách khỏi hợp đồng gốc
+Enum addendum_status {
+  AWAITING_SIGNATURE
+  SIGNED
 }
 
 Enum payment_purpose {
@@ -234,63 +237,61 @@ Table policy_rules {
   Note: 'Quy tắc giá áp theo loại unit: tỷ lệ cọc, giá thuê, phụ thu, phí trễ. Phụ thu có trần (Cap).'
 }
 
-// -------------------------------------- NHÓM 4: ĐẶT CHỖ & THUÊ (BK-/RT-) ----
+// -------------------------------------- NHÓM 4: ĐẶT CHỖ & THUÊ (BK-) ----
+// V3: bảng rentals gộp vào reservations — 1 bản ghi trọn vòng đời
+// đặt chỗ → thuê → trả; cọc duy trì phiên
 Table reservations {
   ReservationID bigint [pk, increment]
-  Code varchar(20) [unique, not null] // BK-2026-0001
+  Code varchar(20) [unique, not null] // BK-2026-0001 — duy nhất suốt vòng đời
   CustomerID bigint [not null]
   UnitID bigint [not null]
   StartDate date [not null] // đã cộng turnover buffer
-  EndDate date [not null]
-  DepositAmount decimal(18,2) [not null] // cọc 10%
-  Status reservation_status [not null]
-  Note: 'Đặt cọc 10% giữ unit. Quá hạn check-in → unit trả về AVAILABLE, hoàn cọc theo policy.'
-}
-
-Table rentals {
-  RentalID bigint [pk, increment]
-  Code varchar(20) [unique, not null] // RT-2026-0001
-  ReservationID bigint [unique, not null]
-  CustomerID bigint [not null]
-  UnitID bigint [not null]
   EndDate date [not null] // dịch ngay khi phí gia hạn được thanh toán
-  AccessCode varchar(10) [null] // cấp khi check-in
-  DepositHeld decimal(18,2) [not null]
-  Status rental_status [not null]
-  Note: 'Sinh đúng một lần khi check-in hoàn tất (1:1 với reservation). Gia hạn hiệu lực theo thanh toán — phụ lục chỉ là hồ sơ giấy.'
+  DepositAmount decimal(18,2) [not null] // cọc 10% giữ suốt phiên
+  AccessCode varchar(10) [null] // cấp khi check-in (CHECKED_IN = đang thuê)
+  Status reservation_status [not null]
+  Note: 'V3: gộp vòng đời rental. CHECKED_IN = trạng thái "đang thuê" (nắm AccessCode, cọc giữ, EndDate). Quá hạn check-in → EXPIRED, unit trả về AVAILABLE. CANCELLED dự phòng — v1 không kích hoạt.'
 }
 
 Table extensions {
   ExtensionID bigint [pk, increment]
-  RentalID bigint [not null]
+  ReservationID bigint [not null] // V3: đổi nguồn từ rentals
   OldEndDate date [not null]
   NewEndDate date [not null]
   ExtensionFee decimal(18,2) [not null]
   Status extension_status [not null]
-  Note: 'Chuỗi kiểm toán mỗi lần gia hạn: ngày cũ → ngày mới + phí. Căn cứ sinh phụ lục hợp đồng.'
+  Note: 'Chuỗi kiểm toán mỗi lần gia hạn: ngày cũ → ngày mới + phí. Căn cứ sinh phụ lục hợp đồng (contract_addendums).'
 }
 
 Table checkout_requests {
   RequestID bigint [pk, increment]
-  RentalID bigint [not null]
+  ReservationID bigint [not null] // V3: đổi nguồn từ rentals
   RequestedDate date [not null]
   Status checkout_request_status [not null]
   Note: 'Ngày trả mới nhất luôn thắng ("Latest new checkout") để không đè reservation kế tiếp. Sinh task checkout cho staff trực zone.'
 }
 
-// -------------------------------------------------- NHÓM 5: HỢP ĐỒNG ----
+// ------------------------------- NHÓM 5: HỢP ĐỒNG & PHỤ LỤC (CT-/CT-…-A1) ----
 Table contracts {
   ContractID bigint [pk, increment]
   Code varchar(20) [unique, not null] // CT-2026-0001
-  RentalID bigint [not null]
-  ParentContractID bigint [null] // phụ lục trỏ về hợp đồng gốc
+  ReservationID bigint [unique, not null] // V3: 1:1 với reservation ("sinh")
   PolicyID int [not null]
-  Type contract_type [not null]
   ContentSnapshot text [not null]
   SignedPhotoUrl varchar(255) [null]
-  SignatureDueDate date [null] // hạn ký phụ lục 7 ngày
   Status contract_status [not null]
-  Note: 'Auto-draft ngay khi đặt cọc thành công, khoá phiên bản policy. Không bao giờ bị sửa — mọi thay đổi = phụ lục mới. Ảnh bản ký là điều kiện cấp access code.'
+  Note: 'V3: mỗi đặt chỗ sinh đúng MỘT hợp đồng gốc (1:1, auto-draft khi đặt cọc thành công, khoá phiên bản policy). Không bao giờ bị sửa — mọi thay đổi = phụ lục riêng (contract_addendums). Ảnh bản ký là điều kiện cấp access code.'
+}
+
+Table contract_addendums {
+  AddendumID bigint [pk, increment]
+  ContractID bigint [not null] // hợp đồng gốc
+  ExtensionID bigint [unique, null] // 1:0..1 — NULL cho phụ lục loại khác tương lai
+  ContentSnapshot text [not null]
+  SignedPhotoUrl varchar(255) [null]
+  SignatureDueDate date [not null] // hạn ký 7 ngày
+  Status addendum_status [not null]
+  Note: 'V3: bảng riêng thay self-FK ParentContractID. Sinh từ nghiệp vụ gia hạn (auto-draft khi phí xác nhận). Quá hạn ký KHÔNG có terminal — EndDate đã dịch từ lúc trả phí, phụ lục chỉ là hồ sơ giấy, không hold unit.'
 }
 
 // --------------------------------- NHÓM 6: THANH TOÁN & THANH LÝ ----
@@ -298,20 +299,19 @@ Table payments {
   PaymentID bigint [pk, increment]
   ReceiptCode varchar(20) [unique, not null]
   PayerID bigint [not null]
-  ReservationID bigint [null]
-  RentalID bigint [null]
-  ExtensionID bigint [null]
-  SettlementID bigint [null]
+  ReservationID bigint [null] // cọc 10% + thuê 100% (V3: gộp 2 touchpoint)
+  ExtensionID bigint [null] // phí gia hạn
+  SettlementID bigint [null] // phí hư hại / phát sinh vượt cọc
   Purpose payment_purpose [not null]
   Method payment_method [not null]
   Amount decimal(18,2) [not null] // > 0
   Status payment_status [not null]
-  Note: 'CHECK: đúng một trong bốn cột tham chiếu (Reservation/Rental/Extension/Settlement) NOT NULL. State chart Payment: Pending → Processing → Succeeded/Failed/Expired.'
+  Note: 'CHECK: đúng một trong BA cột tham chiếu (Reservation/Extension/Settlement) NOT NULL. 4 touchpoint: deposit / rent / extension fee / extra fee. State chart Payment: Pending → Processing → Succeeded/Failed/Expired.'
 }
 
 Table settlements {
   SettlementID bigint [pk, increment]
-  RentalID bigint [unique, not null] // 1:0..1 với rental
+  ReservationID bigint [unique, not null] // V3: 1:0..1 với reservation
   ContractID bigint [not null]
   StaffID bigint [not null]
   DamageFee decimal(18,2) [not null, default: 0]
@@ -336,7 +336,7 @@ Table support_tickets {
   Code varchar(20) [unique, not null] // SR-2026-0001
   CustomerID bigint [not null]
   UnitID bigint [not null]
-  RentalID bigint [null]
+  ReservationID bigint [null] // V3: ngữ cảnh phiên đặt chỗ — thuê
   IncidentType incident_type [not null]
   Status ticket_status [not null]
   AssignedStaffID bigint [null]
@@ -357,7 +357,7 @@ Table escalations {
 Table tasks {
   TaskID bigint [pk, increment]
   Type task_type [not null]
-  RefCode varchar(20) [null] // BK- / RT- / SR- / CT-
+  RefCode varchar(20) [null] // BK- / SR- / CT- (V3: không còn RT-)
   AssignedStaffID bigint [not null]
   WorkDate date [not null]
   Status task_status [not null]
@@ -386,7 +386,7 @@ Table activity_logs {
   Note: 'Nhật ký kiểm toán append-only (chỉ INSERT). Mọi thay đổi trạng thái kèm giá trị trước/sau và lý do.'
 }
 
-// ---------------------------------------------------- QUAN HỆ (34) ----
+// ---------------------------------------------------- QUAN HỆ (31) ----
 // Nhóm 1: Người dùng & cơ sở
 Ref: roles.RoleID > users.RoleID                       // 1:N phân vai
 Ref: facilities.FacilityID > zones.FacilityID          // 1:N cơ sở có zone
@@ -399,36 +399,33 @@ Ref: zones.ZoneID > staff_assignments.ZoneID           // 1:N phụ trách
 Ref: rental_policies.PolicyID > policy_rules.PolicyID  // 1:N định nghĩa
 Ref: unit_types.TypeID > policy_rules.TypeID           // 1:N áp dụng cho
 
-// Nhóm 3: Đặt chỗ & thuê
+// Nhóm 3: Đặt chỗ & thuê (V3: rentals gộp vào reservations)
 Ref: users.UserID > reservations.CustomerID            // 1:N khách đặt
-Ref: units.UnitID > reservations.UnitID                // 1:N unit được giữ
-Ref: reservations.ReservationID - rentals.ReservationID // 1:1 check-in sinh đúng 1 rental
-Ref: users.UserID > rentals.CustomerID                 // 1:N khách thuê
-Ref: units.UnitID > rentals.UnitID                     // 1:N lịch sử thuê
-Ref: rentals.RentalID > extensions.RentalID            // 1:N gia hạn
-Ref: rentals.RentalID > checkout_requests.RentalID     // 1:N xin trả
+Ref: units.UnitID > reservations.UnitID                // 1:N unit được giữ (và thuê)
+Ref: reservations.ReservationID > extensions.ReservationID       // 1:N gia hạn
+Ref: reservations.ReservationID > checkout_requests.ReservationID // 1:N xin trả
 
-// Nhóm 4: Hợp đồng
-Ref: rentals.RentalID > contracts.RentalID             // 1:N gốc + phụ lục
-Ref: contracts.ParentContractID > contracts.ContractID // 1:N tự tham chiếu
+// Nhóm 4: Hợp đồng & phụ lục (V3: 1:1 + bảng addendum riêng)
+Ref: reservations.ReservationID - contracts.ReservationID // 1:1 sinh đúng 1 hợp đồng gốc
 Ref: rental_policies.PolicyID > contracts.PolicyID     // 1:N khoá phiên bản
+Ref: contracts.ContractID > contract_addendums.ContractID // 1:N hợp đồng có phụ lục
+Ref: extensions.ExtensionID - contract_addendums.ExtensionID // 1:0..1 phụ lục gia hạn (tùy chọn)
 
-// Nhóm 5: Tiền
+// Nhóm 5: Tiền (V3: cọc + thuê 100% cùng nguồn reservation)
 Ref: users.UserID > payments.PayerID                   // 1:N người trả
-Ref: reservations.ReservationID > payments.ReservationID // 1:N cọc 10%
-Ref: rentals.RentalID > payments.RentalID              // 1:N thuê 100%
+Ref: reservations.ReservationID > payments.ReservationID // 1:N cọc 10% + thuê 100%
 Ref: extensions.ExtensionID - payments.ExtensionID     // 1:0..1 phí gia hạn
 Ref: settlements.SettlementID > payments.SettlementID  // 1:N phí hư hại/phát sinh
 
 // Nhóm 6: Trả kho & thanh lý
-Ref: rentals.RentalID - settlements.RentalID           // 1:0..1 mỗi rental thanh lý 1 lần
+Ref: reservations.ReservationID - settlements.ReservationID // 1:0..1 mỗi phiên thanh lý 1 lần
 Ref: contracts.ContractID > settlements.ContractID     // 1:N đối chiếu
 Ref: settlements.SettlementID > inspections.SettlementID // 1:N checklist
 
 // Nhóm 7: Hỗ trợ
 Ref: users.UserID > support_tickets.CustomerID         // 1:N khách gửi
 Ref: units.UnitID > support_tickets.UnitID             // 1:N unit liên quan
-Ref: rentals.RentalID > support_tickets.RentalID       // 1:N ngữ cảnh
+Ref: reservations.ReservationID > support_tickets.ReservationID // 1:N ngữ cảnh
 Ref: support_tickets.TicketID - escalations.TicketID   // 1:0..1 escalate
 
 // Nhóm 8: Vận hành & hệ thống

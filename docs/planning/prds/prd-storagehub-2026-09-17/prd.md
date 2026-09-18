@@ -118,12 +118,12 @@ Thành công của dự án (capstone): demo trọn 5 user journeys chính khôn
 - **Unit Type** — Loại kho (vd Indoor 5 m²); là căn cứ của các Policy Rule giá.
 - **Turnover Buffer** — Số ngày chuẩn bị (dọn dẹp) sau checkout trước khi Unit cho thuê lại. Là **Policy Rule**, không phải trạng thái.
 - **Rental Policy** — Bộ định giá có phiên bản (v3 demo). Mỗi phiên bản chứa các **Policy Rule**: giá thuê theo Unit Type, các loại phụ thu + trần, **Deposit %**, **Turnover Buffer (ngày)**. Hợp đồng khóa phiên bản mà nó soạn từ đó.
-- **Reservation** — Bản ghi sinh ở trạng thái PENDING_PAYMENT ngay khi khách xác nhận Booking Summary (chưa giữ Unit — bỏ modal không tạo giữ chỗ); trả cọc thành công → RESERVED (Unit bị giữ từ đây). Tạo tối đa một **Rental**. Mã `BK-`. V1 có đúng một lối ra rủi ro: hết ngày nhận kho mà chưa check-in → EXPIRED, mất cọc (FR-36); không có cancel (§6).
+- **Reservation** — Bản ghi sinh ở trạng thái PENDING_PAYMENT ngay khi khách xác nhận Booking Summary (chưa giữ Unit — bỏ modal không tạo giữ chỗ); trả cọc thành công → RESERVED (Unit bị giữ từ đây). **Gồm trọn vòng đời thuê sau check-in** (quyết định V3 2026-09-18 — gộp bảng Rental cũ vào Reservation): RESERVED → CHECKED_IN (đang thuê) → CHECKOUT_REQUESTED → CLOSED; EndDate dịch ngay khi gia hạn; Access Code thuộc bản ghi này. Mã `BK-` duy nhất suốt vòng đời. V1 có đúng một lối ra rủi ro: hết ngày nhận kho mà chưa check-in → EXPIRED, mất cọc (FR-36); không có cancel (§6).
 - **Deposit** — Tiền cọc = Deposit % × tổng tiền thuê (demo 10%), hoàn lại được, tất toán qua **Settlement**.
-- **Rental** — Phiên thuê đang hoạt động. Mã `RT-`. Sở hữu **Extension**, **Contract**, **Payment**, **Inspection**, **Settlement**; có **Access Code**.
+- **Rental** — Giai đoạn của **Reservation** từ check-in (CHECKED_IN) đến khi đóng (CLOSED): khái niệm hiển thị trên UI (Rental Detail, My Rentals; nhãn `RT-` trong mock data), **không còn là bảng riêng** (gộp vào Reservation theo V3 2026-09-18). Giai đoạn này sở hữu **Extension**, **Contract**, **Payment**, **Inspection**, **Settlement**; có **Access Code**.
 - **Extension** — Yêu cầu gia hạn thuộc một Rental. Ngày checkout mới có hiệu lực **ngay sau khi thanh toán phí gia hạn**; sinh một **Addendum**. Trạng thái: PENDING_PAYMENT → APPLIED (đóng modal chưa trả = không ghi nhận; không có CANCELLED trong v1). Deposit giữ nguyên theo booking gốc.
-- **Contract** — Hợp đồng giấy auto-draft (từ Reservation + Rental Policy version), không ai soạn tay, không chỉnh sửa được. Mã `CT-`; trạng thái (7 giá trị, chuẩn ERD): Draft → Printed → Signed → Active → Closed, kèm Superseded (bị thay bởi re-draft) và AWAITING_SIGNATURE (Addendum đã trả phí, chờ ký tại quầy).
-- **Addendum** — Contract loại phụ lục (`CT-…-A1`) sinh từ Extension; ký giấy tại quầy trong 7 ngày; là giấy tờ thủ tục, **không hold Unit**.
+- **Contract** — Hợp đồng gốc auto-draft (từ Reservation + Rental Policy version), không ai soạn tay, không chỉnh sửa được. Mã `CT-`; trạng thái (6 giá trị): Draft → Printed → Signed → Active → Closed, kèm Superseded (bị thay bởi re-draft). AWAITING_SIGNATURE chuyển sang vòng đời riêng của **Addendum** (V3 2026-09-18).
+- **Addendum** — Bản ghi riêng (entity `CONTRACT_ADDENDUMS` — V3 2026-09-18) thuộc **Contract** (`CT-…-A1`), sinh từ Extension; ký giấy tại quầy trong 7 ngày; là giấy tờ thủ tục, **không hold Unit**. Trạng thái: AWAITING_SIGNATURE → Signed (khi có ảnh bản ký).
 - **Payment** — Giao dịch qua Payment Modal giả lập tại 4 touchpoint: Deposit (booking), 100% rent (check-in), Extension fee, và Extra fee (phần chênh khi Settlement Charge vượt Deposit — trả trước khi Rental đóng). Phương thức Card / MoMo / VNPay QR.
 - **Settlement** — Bảng tất toán lúc checkout: Deposit ± các **Settlement Charge** → hoàn / thu thêm. Settlement receipt là biên bản (khách không ký thêm gì).
 - **Settlement Charge** — Một khoản phí khấu trừ (vd damage fee) — **bắt buộc có reason**.
@@ -137,7 +137,7 @@ Thành công của dự án (capstone): demo trọn 5 user journeys chính khôn
 - **IncidentType** — Loại sự cố của Support Ticket: LOST_ACCESS / DEVICE_ISSUE / SECURITY / CLEANLINESS / OTHER.
 - **Activity Log** — Audit trail append-only: actor, thời điểm, thực thể, hành động, from → to, reason (nơi bắt buộc). Không có ghi chép gì bị xóa.
 - **Access Code** — Mã vào kho; chỉ cấp sau khi Contract có ảnh bản ký.
-- **Availability** — Giá trị suy ra (Reservation + Rental + Turnover Buffer); nhãn "Available soon" là derived label, không phải trạng thái Unit.
+- **Availability** — Giá trị suy ra (Reservation + Turnover Buffer); nhãn "Available soon" là derived label, không phải trạng thái Unit.
 - **Notification / Toast** — Bell feed bền vững (deep link, unread persist) / phản hồi tức thời ~4s. Không có email.
 - **KPI drill-down** — Hợp đồng dashboard: mọi số liệu bấm xuyên xuống bảng dữ liệu lọc đúng slice.
 
@@ -168,7 +168,7 @@ Thành công của dự án (capstone): demo trọn 5 user journeys chính khôn
 
 #### FR-4: Browse Units với availability chính xác (P1)
 [Customer] lọc Unit theo loại / kích thước / ngày bắt đầu / thời hạn; kết quả là lưới card + chip đếm "N units available · live"; sort mặc định giá thấp → cao.
-- **Consequences:** mỗi dòng availability tính theo Reservation + Rental + Turnover Buffer (Policy Rule) tại thời điểm query; Unit đang Rented/Maintenance/Retired không xuất hiện; card buffer hiển thị "Available {date} · cleaning buffer" và vẫn đặt được với ngày đó. Filter chỉ re-query khi bấm Search (không per keystroke); filter active persist trong phiên và được echo thành chip removable ở empty state.
+- **Consequences:** mỗi dòng availability tính theo Reservation + Turnover Buffer (Policy Rule) tại thời điểm query; Unit đang Rented/Maintenance/Retired không xuất hiện; card buffer hiển thị "Available {date} · cleaning buffer" và vẫn đặt được với ngày đó. Filter chỉ re-query khi bấm Search (không per keystroke); filter active persist trong phiên và được echo thành chip removable ở empty state.
 
 #### FR-5: Reserve re-check chống stale (P1)
 [Customer] bấm Reserve → hệ thống kiểm tra lại availability; Unit đã bị chiếm giữa chừng → quay về lưới + toast gợi ý unit tương tự.
@@ -413,13 +413,19 @@ Skeleton khớp layout (swap không layout shift); empty state factual + echo fi
 Reconciliation với `ERD_Statechart_LaTeX` (2026-09-17/18) phát hiện các lệch; bên dưới là phía cần đổi khi vào architecture:
 
 - `POLICY_RULES.RuleType`: thêm `TURNOVER_BUFFER` (nền FR-30/FR-4) — hoặc field riêng trên `RENTAL_POLICIES`.
-- `CONTRACTS.Status`: giữ chuẩn 7 giá trị gồm `AWAITING_SIGNATURE` (glossary §3 đã khớp).
 - `EXTENSIONS.Status`: bỏ `CANCELLED` — chỉ `PENDING_PAYMENT / APPLIED`.
 - `ActivityLogs.Reason`: đổi NULL-able; NOT NULL chỉ áp dụng cho action loại status-change/charge (khớp NFR-4).
 - Relocation: đổi `UnitID` trên Rental + ActivityLog `RELOCATION` — không cần entity mới (quyết định 2026-09-18).
 - Reservation: sinh bản ghi `PENDING_PAYMENT` ngay tại Booking Summary (không chỉ sau cọc).
 - Báo cáo ERD §1.2: bỏ dòng "Facility Manager phê duyệt policy" — policy không qua bước duyệt (FR-29).
 - `PAYMENTS`: purpose `EXTRA_FEE` + FK SettlementID đã đúng — PRD đã cập nhật touchpoint thứ 4 theo ERD (FR-8/FR-18).
+
+**V3 conceptual model (chốt 2026-09-18, xem `Conceptual_Model_StorageHub_V3.drawio`) — 4 thay đổi kiến trúc dữ liệu, triển khai trực tiếp khi vào architecture:**
+
+- **Role 1—N User** (đã đúng trong ERD/DBML; conceptual model V2 cũ vẽ N:N sai): mỗi user đúng một role; đăng ký không cho chọn role (FR-1), staff provisioning qua seed.
+- **Gộp `RENTALS` vào `RESERVATIONS`** — một bảng cho trọn vòng đời đặt chỗ → thuê → trả: cọc duy trì phiên (không tồn tại "booking không có rental"); `reservation_status` gộp: `PENDING_PAYMENT / RESERVED / CHECKED_IN / CHECKOUT_REQUESTED / CLOSED / EXPIRED` (+`CANCELLED` dự phòng theo blueprint §7 — v1 không kích hoạt, §6); `reservations` nhận thêm `AccessCode`; các FK `RentalID` trên `extensions`, `checkout_requests`, `settlements`, `support_tickets`, `payments` đổi trỏ `reservations.ReservationID`; `payments` bỏ cột `RentalID` (còn 3 cột tham chiếu + CHECK đúng-một).
+- **Tách bảng `CONTRACT_ADDENDUMS`** — `CONTRACTS` 1—N `CONTRACT_ADDENDUMS` (bỏ self-FK `ParentContractID` và `Type ORIGINAL/ADDENDUM`); `EXTENSIONS` 1—0..1 `CONTRACT_ADDENDUMS` (UNIQUE, tùy chọn — chỉ phụ lục gia hạn có extension); `SignatureDueDate` + ảnh bản ký phụ lục thuộc Addendum; `CONTRACTS.Status` còn 6 giá trị, `ContractAddendums.Status` = `AWAITING_SIGNATURE / SIGNED`.
+- **`RESERVATIONS` 1—1 `CONTRACTS`** — mỗi đặt chỗ sinh đúng một hợp đồng gốc (auto-draft FR-10); FK `ReservationID` UNIQUE trên `contracts`.
 
 ## 10. Assumptions Index
 

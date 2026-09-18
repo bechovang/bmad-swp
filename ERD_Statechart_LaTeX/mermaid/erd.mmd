@@ -1,4 +1,6 @@
-%% StorageHub — ERD (crow's foot) — 22 thực thể, 8 nhóm
+%% StorageHub — ERD (crow's foot) — 22 thực thể, 8 nhóm — V3 2026-09-18
+%% Thay đổi V3: gộp RENTALS vào RESERVATIONS (1 bảng trọn vòng đời);
+%% tách CONTRACT_ADDENDUMS khỏi CONTRACTS (bỏ self-FK); RESERVATIONS 1:1 CONTRACTS.
 %% Nền tảng: EXPERIENCE.md (ux-swp391-2026-09-11) + 7 flows swimlane + tính năng hợp đồng CT-
 erDiagram
     %% ── Nhóm 1: Người dùng & cơ sở ──
@@ -13,36 +15,33 @@ erDiagram
     RENTAL_POLICIES ||--o{ POLICY_RULES : "định nghĩa"
     UNIT_TYPES ||--o{ POLICY_RULES : "áp dụng cho"
 
-    %% ── Nhóm 3: Đặt & thuê ──
+    %% ── Nhóm 3: Đặt chỗ & thuê (V3: gộp Rental) ──
     USERS ||--o{ RESERVATIONS : "đặt"
     UNITS ||--o{ RESERVATIONS : "được giữ"
-    RESERVATIONS ||--|| RENTALS : "kích hoạt"
-    USERS ||--o{ RENTALS : "thuê"
-    UNITS ||--o{ RENTALS : "cho thuê"
-    RENTALS ||--o{ EXTENSIONS : "gia hạn"
-    RENTALS ||--o{ CHECKOUT_REQUESTS : "xin trả"
+    RESERVATIONS ||--o{ EXTENSIONS : "gia hạn"
+    RESERVATIONS ||--o{ CHECKOUT_REQUESTS : "xin trả"
 
-    %% ── Nhóm 4: Hợp đồng ──
-    RENTALS ||--o{ CONTRACTS : "mang"
-    CONTRACTS ||--o{ CONTRACTS : "phụ lục của"
+    %% ── Nhóm 4: Hợp đồng & phụ lục (V3: tách Addendum) ──
+    RESERVATIONS ||--|| CONTRACTS : "sinh"
     RENTAL_POLICIES ||--o{ CONTRACTS : "khóa phiên bản"
+    CONTRACTS ||--o{ CONTRACT_ADDENDUMS : "có"
+    EXTENSIONS ||--o| CONTRACT_ADDENDUMS : "kèm theo"
 
     %% ── Nhóm 5: Tiền ──
     USERS ||--o{ PAYMENTS : "thanh toán"
-    RESERVATIONS ||--o{ PAYMENTS : "deposit 10%"
-    RENTALS ||--o{ PAYMENTS : "rent 100%"
+    RESERVATIONS ||--o{ PAYMENTS : "cọc 10% + thuê 100%"
     EXTENSIONS ||--o| PAYMENTS : "phí gia hạn"
     SETTLEMENTS ||--o{ PAYMENTS : "damage / extra"
 
     %% ── Nhóm 6: Trả kho & thanh lý ──
-    RENTALS ||--o| SETTLEMENTS : "thanh lý"
+    RESERVATIONS ||--o| SETTLEMENTS : "thanh lý"
     CONTRACTS ||--o{ SETTLEMENTS : "đối chiếu"
     SETTLEMENTS ||--o{ INSPECTIONS : "kiểm hạng mục"
 
     %% ── Nhóm 7: Hỗ trợ ──
     USERS ||--o{ SUPPORT_TICKETS : "gửi"
     UNITS ||--o{ SUPPORT_TICKETS : "liên quan"
-    RENTALS ||--o{ SUPPORT_TICKETS : "thuộc phiên thuê"
+    RESERVATIONS ||--o{ SUPPORT_TICKETS : "thuộc phiên thuê"
     SUPPORT_TICKETS ||--o| ESCALATIONS : "được nâng cấp"
 
     %% ── Nhóm 8: Vận hành & hệ thống ──
@@ -126,22 +125,12 @@ erDiagram
         date StartDate
         date EndDate
         decimal DepositAmount
-        enum Status
-    }
-    RENTALS {
-        bigint RentalID PK
-        varchar Code UK
-        bigint ReservationID FK
-        bigint CustomerID FK
-        bigint UnitID FK
-        date EndDate
         varchar AccessCode
-        decimal DepositHeld
         enum Status
     }
     EXTENSIONS {
         bigint ExtensionID PK
-        bigint RentalID FK
+        bigint ReservationID FK
         date OldEndDate
         date NewEndDate
         decimal ExtensionFee
@@ -149,17 +138,23 @@ erDiagram
     }
     CHECKOUT_REQUESTS {
         bigint RequestID PK
-        bigint RentalID FK
+        bigint ReservationID FK
         date RequestedDate
         enum Status
     }
     CONTRACTS {
         bigint ContractID PK
         varchar Code UK
-        bigint RentalID FK
-        bigint ParentContractID FK
+        bigint ReservationID FK
         int PolicyID FK
-        enum Type
+        text ContentSnapshot
+        varchar SignedPhotoUrl
+        enum Status
+    }
+    CONTRACT_ADDENDUMS {
+        bigint AddendumID PK
+        bigint ContractID FK
+        bigint ExtensionID FK
         text ContentSnapshot
         varchar SignedPhotoUrl
         date SignatureDueDate
@@ -170,7 +165,6 @@ erDiagram
         varchar ReceiptCode UK
         bigint PayerID FK
         bigint ReservationID FK
-        bigint RentalID FK
         bigint ExtensionID FK
         bigint SettlementID FK
         enum Purpose
@@ -180,7 +174,7 @@ erDiagram
     }
     SETTLEMENTS {
         bigint SettlementID PK
-        bigint RentalID FK
+        bigint ReservationID FK
         bigint ContractID FK
         bigint StaffID FK
         decimal DamageFee
@@ -200,7 +194,7 @@ erDiagram
         varchar Code UK
         bigint CustomerID FK
         bigint UnitID FK
-        bigint RentalID FK
+        bigint ReservationID FK
         enum IncidentType
         enum Status
         bigint AssignedStaffID FK
