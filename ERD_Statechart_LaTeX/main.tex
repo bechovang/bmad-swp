@@ -566,7 +566,7 @@ Hệ thống gồm \textbf{22 thực thể} chia thành \textbf{8 nhóm chức n
 \end{xltabular}
 
 \subsubsection{CONTRACT\_ADDENDUMS (PHỤ LỤC HỢP ĐỒNG -- CT-…-A1)}
-\textbf{Mô tả:} Phụ lục hợp đồng -- bản ghi riêng (V3 2026-09-18), thuộc về một hợp đồng gốc, hiện chỉ sinh từ nghiệp vụ \textbf{gia hạn}: auto-draft ngay khi phí gia hạn được xác nhận, hạn ký tại quầy 7 ngày. Quá hạn ký \textit{không có terminal}: ngày kết thúc đã dịch từ lúc trả phí nên phụ lục chỉ là hồ sơ giấy. Quan hệ tùy chọn 1:0..1 với \entity{extensions} (một lần gia hạn có tối đa một phụ lục; để NULL cho các phụ lục loại khác trong tương lai).
+\textbf{Mô tả:} Phụ lục hợp đồng -- bản ghi riêng (V3 2026-09-18), thuộc về một hợp đồng gốc, hiện chỉ sinh từ nghiệp vụ \textbf{gia hạn}: auto-draft ngay khi phí gia hạn được xác nhận, hạn ký tại quầy 7 ngày. Quá hạn \textit{không tự đóng}: ngày kết thúc đã dịch từ lúc trả phí nên phụ lục chỉ là hồ sơ giấy; hồ sơ không ký được staff đóng ở một trong hai terminal: \textbf{Expired} (khách không đến ký sau khi hết nhắc) hoặc \textbf{Voided} (staff huỷ chủ động). Quan hệ 1:N với \entity{extensions} (huỷ bản soạn nhầm rồi soạn lại = bản ghi mới cùng lần gia hạn; để NULL cho các phụ lục loại khác trong tương lai).
 
 \begin{xltabular}{\textwidth}{|p{4.4cm}|p{3.6cm}|X|p{3.4cm}|}
 \caption{Thuộc tính thực thể CONTRACT\_ADDENDUMS} \\
@@ -578,11 +578,11 @@ Hệ thống gồm \textbf{22 thực thể} chia thành \textbf{8 nhóm chức n
 \endhead
 \attr{AddendumID} & \sqltype{BIGINT} & Mã phụ lục & PK, AUTO\_INCREMENT \\ \hline
 \attr{ContractID} & \sqltype{BIGINT} & Hợp đồng gốc & FK $\rightarrow$ CONTRACTS \\ \hline
-\attr{ExtensionID} & \sqltype{BIGINT} & Lần gia hạn (nếu là phụ lục gia hạn) & FK $\rightarrow$ EXTENSIONS, UNIQUE (0..1), NULL \\ \hline
+\attr{ExtensionID} & \sqltype{BIGINT} & Lần gia hạn (nếu là phụ lục gia hạn) & FK $\rightarrow$ EXTENSIONS, NULL (1:N) \\ \hline
 \attr{ContentSnapshot} & \sqltype{TEXT} & Nội dung snapshot (ngày mới\ldots) & NOT NULL \\ \hline
 \attr{SignedPhotoUrl} & \sqltype{VARCHAR(255)} & Ảnh bản ký phụ lục & NULL \\ \hline
 \attr{SignatureDueDate} & \sqltype{DATE} & Hạn ký 7 ngày & NOT NULL \\ \hline
-\attr{Status} & \sqltype{ENUM('AWAITING\_SIGNATURE','SIGNED')} & Trạng thái & NOT NULL \\ \hline
+\attr{Status} & \sqltype{ENUM('AWAITING\_SIGNATURE','SIGNED','EXPIRED','VOIDED')} & Trạng thái & NOT NULL \\ \hline
 \end{xltabular}
 
 \subsubsection{PAYMENTS (GIAO DỊCH THANH TOÁN)}
@@ -773,7 +773,7 @@ Tổng cộng \textbf{31 mối quan hệ} (bao gồm 1 quan hệ tự tham chi�
 \entity{reservations} & xin trả & \entity{checkout\_requests} & 1:N & Yêu cầu trả kho của khách \\ \hline
 \entity{reservations} & sinh & \entity{contracts} & 1:1 & Auto-draft đúng một hợp đồng gốc mỗi đặt chỗ \\ \hline
 \entity{contracts} & có & \entity{contract\_addendums} & 1:N & Hợp đồng gốc kèm các phụ lục \\ \hline
-\entity{extensions} & kèm theo & \entity{contract\_addendums} & 1:0..1 & Phụ lục gia hạn (tùy chọn) \\ \hline
+\entity{extensions} & kèm theo & \entity{contract\_addendums} & 1:N & Phụ lục gia hạn (huỷ soạn nhầm rồi soạn lại = bản ghi mới) \\ \hline
 \entity{rental\_policies} & khoá phiên bản & \entity{contracts} & 1:N & Snapshot nội dung theo \attr{PolicyID} \\ \hline
 \entity{users} & thanh toán & \entity{payments} & 1:N & Người trả tiền \\ \hline
 \entity{reservations} & thanh toán & \entity{payments} & 1:N & Cọc 10\% lúc đặt + tiền thuê 100\% tại check-in \\ \hline
@@ -885,7 +885,7 @@ Expired / Closed & -- & $[\circ]$ & Kết thúc phiên đặt chỗ -- thuê \\ 
 
 \subsection{State chart: Contract Addendum (phụ lục -- CT-…-A1)}
 
-V3 (2026-09-18) tách vòng đời phụ lục khỏi hợp đồng gốc -- bản ghi riêng ở bảng \entity{contract\_addendums}. Phụ lục hiện chỉ sinh từ nghiệp vụ \textbf{gia hạn}: auto-draft ngay khi phí gia hạn được xác nhận, chờ ký tại quầy với hạn 7 ngày (bell reminder trước hạn). Điểm thiết kế quan trọng: \textbf{quá hạn ký không có terminal} -- \attr{EndDate} của reservation đã dịch ngay từ lúc trả phí nên phụ lục chỉ là hồ sơ giấy, không giữ unit; hệ thống chỉ banner amber + nhắc việc lặp lại.
+V3 (2026-09-18) tách vòng đời phụ lục khỏi hợp đồng gốc -- bản ghi riêng ở bảng \entity{contract\_addendums}. Phụ lục hiện chỉ sinh từ nghiệp vụ \textbf{gia hạn}: auto-draft ngay khi phí gia hạn được xác nhận, chờ ký tại quầy với hạn 7 ngày (bell reminder trước hạn). Quá hạn \textbf{không tự đóng} -- \attr{EndDate} của reservation đã dịch ngay từ lúc trả phí nên phụ lục chỉ là hồ sơ giấy, không giữ unit; hệ thống chỉ banner amber + nhắc việc lặp lại, khách đến trễ vẫn ký được bình thường. Hồ sơ sẽ không treo vĩnh viễn: staff chủ động đóng ở một trong hai terminal -- \textbf{Expired} (khách không đến ký sau khi hết nhắc) hoặc \textbf{Voided} (soạn nhầm phải huỷ soạn lại, hoặc khách trả kho sớm khiến phụ lục vô nghĩa).
 
 \begin{xltabular}{\textwidth}{|p{2.6cm}|p{4.4cm}|p{2.6cm}|X|}
 \caption{Bảng chuyển dịch trạng thái của Contract Addendum} \\
@@ -897,8 +897,11 @@ V3 (2026-09-18) tách vòng đời phụ lục khỏi hợp đồng gốc -- b�
 \endhead
 $[\bullet]$ & phí gia hạn thành công [auto-draft] & AwaitingSignature & Hạn ký 7 ngày (\attr{SignatureDueDate}); bell reminder \\ \hline
 AwaitingSignature & ký tại quầy + staff chụp ảnh attach & Signed & Lưu \attr{SignedPhotoUrl} \\ \hline
-AwaitingSignature & quá hạn & AwaitingSignature & Banner amber + nhắc việc (tự vòng, không terminal) \\ \hline
+AwaitingSignature & quá hạn & AwaitingSignature & Banner amber + nhắc việc (tự vòng, không tự đóng) \\ \hline
+AwaitingSignature & không đến ký [staff đóng hồ sơ, sau khi hết nhắc] & Expired & Ghi Activity Log; khách đến sau đó phải soạn phụ lục mới \\ \hline
+AwaitingSignature & staff huỷ [soạn nhầm / khách trả kho sớm] & Voided & Soạn lại = bản ghi mới cùng extension (1:N) \\ \hline
 Signed & -- & $[\circ]$ & Phụ lục hoàn tất hồ sơ giấy \\ \hline
+Expired / Voided & -- & $[\circ]$ & Đóng hồ sơ phụ lục (lý do ghi Activity Log) \\ \hline
 \end{xltabular}
 
 \begin{figure}[H]
@@ -1058,7 +1061,7 @@ erDiagram
     RESERVATIONS ||--|| CONTRACTS : "sinh"
     RENTAL_POLICIES ||--o{ CONTRACTS : "khoa phien ban"
     CONTRACTS ||--o{ CONTRACT_ADDENDUMS : "co"
-    EXTENSIONS ||--o| CONTRACT_ADDENDUMS : "kem theo"
+    EXTENSIONS ||--o{ CONTRACT_ADDENDUMS : "kem theo"
 
     %% ── Nhom 5: Tien ──
     USERS ||--o{ PAYMENTS : "thanh toan"
@@ -1358,14 +1361,19 @@ stateDiagram-v2
 
     AwaitingSignature --> Signed : ky tai quay + staff chup anh attach
     AwaitingSignature --> AwaitingSignature : qua han [banner amber + nhac viec]
+    AwaitingSignature --> Expired : khong den ky [staff dong ho so, sau khi het nhac]
+    AwaitingSignature --> Voided : staff huy [soan nham / khach tra kho som]
 
     Signed --> [*] : phu luc hoan tat ho so giay
+    Expired --> [*] : dong ho so khong ky
+    Voided --> [*] : dong ho so (soan lai = ban ghi moi)
 
     note right of AwaitingSignature
-        Qua han khong co terminal:
-        EndDate da dich tu luc tra phi,
-        phu luc chi la ho so giay -
-        khong hold unit.
+        Qua han KHONG tu dong: EndDate da dich
+        tu luc tra phi, phu luc chi la ho so giay -
+        khong hold unit; khach den tre van ky duoc.
+        Staff dong tay: Expired (khong den ky)
+        hoac Voided (soan nham / tra kho som).
         Bell reminder truoc han.
     end note
 \end{Verbatim}

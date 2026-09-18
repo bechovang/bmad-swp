@@ -78,6 +78,8 @@ Enum contract_status {
 Enum addendum_status {
   AWAITING_SIGNATURE
   SIGNED
+  EXPIRED
+  VOIDED
 }
 
 Enum payment_purpose {
@@ -286,12 +288,12 @@ Table contracts {
 Table contract_addendums {
   AddendumID bigint [pk, increment]
   ContractID bigint [not null] // hợp đồng gốc
-  ExtensionID bigint [unique, null] // 1:0..1 — NULL cho phụ lục loại khác tương lai
+  ExtensionID bigint [null] // 1:N — bỏ UNIQUE (2026-09-18): VOIDED soạn lại = bản ghi mới cùng extension
   ContentSnapshot text [not null]
   SignedPhotoUrl varchar(255) [null]
   SignatureDueDate date [not null] // hạn ký 7 ngày
   Status addendum_status [not null]
-  Note: 'V3: bảng riêng thay self-FK ParentContractID. Sinh từ nghiệp vụ gia hạn (auto-draft khi phí xác nhận). Quá hạn ký KHÔNG có terminal — EndDate đã dịch từ lúc trả phí, phụ lục chỉ là hồ sơ giấy, không hold unit.'
+  Note: 'V3: bảng riêng thay self-FK ParentContractID. Sinh từ nghiệp vụ gia hạn (auto-draft khi phí xác nhận). Quá hạn KHÔNG auto-đóng (EndDate đã dịch từ lúc trả phí, phụ lục không hold unit) — staff đóng EXPIRED (khách không đến ký, sau khi hết nhắc) hoặc VOIDED (soạn nhầm / khách trả kho sớm).'
 }
 
 // --------------------------------- NHÓM 6: THANH TOÁN & THANH LÝ ----
@@ -409,7 +411,7 @@ Ref: reservations.ReservationID > checkout_requests.ReservationID // 1:N xin tr�
 Ref: reservations.ReservationID - contracts.ReservationID // 1:1 sinh đúng 1 hợp đồng gốc
 Ref: rental_policies.PolicyID > contracts.PolicyID     // 1:N khoá phiên bản
 Ref: contracts.ContractID > contract_addendums.ContractID // 1:N hợp đồng có phụ lục
-Ref: extensions.ExtensionID - contract_addendums.ExtensionID // 1:0..1 phụ lục gia hạn (tùy chọn)
+Ref: extensions.ExtensionID > contract_addendums.ExtensionID // 1:N phụ lục gia hạn (VOIDED soạn lại = bản ghi mới)
 
 // Nhóm 5: Tiền (V3: cọc + thuê 100% cùng nguồn reservation)
 Ref: users.UserID > payments.PayerID                   // 1:N người trả

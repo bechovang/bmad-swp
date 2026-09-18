@@ -9,7 +9,18 @@
 
 Tài liệu đã đồng bộ V3 (tôi đã sửa): PRD glossary + §9.1, báo cáo LaTeX (`ERD_Statechart_LaTeX/` — 22 thực thể / **31 quan hệ** / 7 state chart, PDF 38 trang), DBML (`ERD_Statechart_Drawio/ERD_StorageHub.dbml` — **22 bảng / 31 refs**), và `Conceptual_Model_StorageHub_V3.drawio` (+EN) ở root.
 
-**Riêng các file draw.io dưới đây bạn tự sửa** (theo yêu cầu). Sửa theo thứ tự A → E là khớp truyện nhất.
+> ✅ **CẬP NHẬT 2026-09-18:** Các mục **A → E đã làm xong** (Claude sửa trực tiếp theo yêu cầu):
+> - **A.** StateChart2 Reservation (+EN) — gộp vòng đời Rental: thêm CheckoutRequested / Closed / final, self-loop gia hạn, note "CheckedIn = đang thuê"
+> - **B.** StateChart3 — tạo mới `StateChart3_Addendum.drawio` (+EN); 2 file Rental cũ đã chuyển vào `ERD_Statechart_Drawio/archive/`
+> - **C.** StateChart4 Contract (+EN) — bỏ AwaitingSignature, e4 = "check-in hoàn tất", note chỉ tới contract_addendums, thêm final cho Superseded
+> - **D.** StateChart1 Unit — guard "không reservation" (bản EN giữ nguyên — đã mất guard khi bạn sửa tay)
+> - **E.** StateChart7 Payment (+EN) — thêm "extension fee / extra fee"
+> - Thư mục **`StateCharts_V3/`** (root) chứa bản sao 7 state chart VN mới nhất.
+> - ✅ **Cập nhật thêm 2026-09-18 (phương án C):** State Chart 3 Addendum có thêm 2 terminal **EXPIRED** (khách không đến ký — staff đóng hồ sơ) + **VOIDED** (staff huỷ chủ động: soạn nhầm / trả kho sớm) → `addendum_status` 4 giá trị, **Extension 1—N Addendum** (bỏ UNIQUE). Đã ripple: chart 3 VN+EN, DBML, LaTeX (PDF 38 trang), PRD glossary + §9.1, Conceptual V3 VN+EN (nhãn cạnh "N"). `StateCharts_V3/` giờ có cả 7 bản EN.
+>
+> **Còn lại bạn tự làm:** F (archive V1/V2 conceptual), G (V3_EN xoá note "Full lifecycle"), H (Flow5 — tùy chọn).
+
+Các mục dưới đây giữ nguyên làm tài liệu đối chiếu. Sửa theo thứ tự A → E là khớp truyện nhất.
 
 ---
 
@@ -205,11 +216,12 @@ Bản Việt bạn đã tự xoá note cạnh RESERVATION, nhưng **bản EN cò
 
 ## Checklist tổng
 
-- [ ] A. StateChart2 Reservation (+EN): thêm CheckoutRequested/Closed/self-loop/note, sửa 2 label
-- [ ] B. StateChart3 → Addendum (+EN): Save As tên mới, vẽ lại 2 trạng thái, xoá file Rental cũ
-- [ ] C. StateChart4 Contract (+EN): xoá nhánh AwaitingSignature, sửa guard, thêm Superseded → ◦
-- [ ] D. StateChart1 Unit (+EN): guard "không reservation"
-- [ ] E. StateChart7 Payment (+EN): thêm `/ extra fee`
+- [x] A. StateChart2 Reservation (+EN): thêm CheckoutRequested/Closed/self-loop/note, sửa 2 label — *Claude đã sửa 2026-09-18*
+- [x] B. StateChart3 → Addendum (+EN): tạo file mới `StateChart3_Addendum.drawio` (+EN); Rental cũ → `ERD_Statechart_Drawio/archive/` — *Claude đã sửa 2026-09-18*
+- [x] C. StateChart4 Contract (+EN): xoá nhánh AwaitingSignature, sửa guard, thêm Superseded → ◦ — *Claude đã sửa 2026-09-18*
+- [x] D. StateChart1 Unit (+EN): guard "không reservation" — *Claude đã sửa 2026-09-18 (bản EN giữ nguyên)*
+- [x] E. StateChart7 Payment (+EN): thêm `/ extra fee` — *Claude đã sửa 2026-09-18*
+- [x] ➕ Tạo thư mục `StateCharts_V3/` (root) chứa 7 state chart VN mới nhất — *Claude đã tạo 2026-09-18*
 - [ ] F. V1/V2 → `archive/`
 - [ ] G. V3_EN: xoá note "Full lifecycle (Rental Session merged in)"
 - [ ] H. Flow5 (tùy chọn): bỏ chữ "Rental,"

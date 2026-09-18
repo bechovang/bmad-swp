@@ -25,7 +25,7 @@ erDiagram
     RESERVATIONS ||--|| CONTRACTS : "sinh"
     RENTAL_POLICIES ||--o{ CONTRACTS : "khóa phiên bản"
     CONTRACTS ||--o{ CONTRACT_ADDENDUMS : "có"
-    EXTENSIONS ||--o| CONTRACT_ADDENDUMS : "kèm theo"
+    EXTENSIONS ||--o{ CONTRACT_ADDENDUMS : "kèm theo"
 
     %% ── Nhóm 5: Tiền ──
     USERS ||--o{ PAYMENTS : "thanh toán"
